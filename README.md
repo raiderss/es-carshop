@@ -25,9 +25,6 @@ A premium car dealership system for FiveM servers featuring a modern UI, advance
 - 📦 Stock management system
 - 🎮 Gamepad and keyboard support
 - 🔔 Notification system
-- 🌙 Dark mode interface
-- 🎯 Optimized for SEO and performance
-
 
 
 ## 🖼️ Preview![Screenshot 2025-04-09 16-50-14](https://github.com/user-attachments/assets/b6ea5d3f-9188-483f-937b-1abc306231c1)
