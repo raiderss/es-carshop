@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>es-carshop</title>
+    <link rel="stylesheet" href="./assets/css/app.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/line-awesome/dist/line-awesome/css/line-awesome.min.css">
+</head>
+
+<body>
+
+  <div id="app" :style="{ display: ui ? 'flex' : 'none' }" class="cyberpunk-container">
+
+    <div class="cyber-grid">
+       
+      <div class="car-list-panel">
+        <div class="cyber-panel-header">
+          <div class="cyber-logo">
+            <span class="cyber-glitch" data-text="NIGHT">NIGHT</span>
+            <span class="cyber-glitch-2" data-text="CARS">CARS</span>
+          </div>
+          <div class="search-container">
+            <input 
+              type="text" 
+              placeholder="SEARCH VEHICLES..." 
+              class="cyber-search"
+              :value="searchQuery"
+              @input="handleSearch($event.target.value)"
+              @keydown.esc="clearSearch">
+            <i class="fas fa-search cyber-search-icon"></i>
+            <i v-if="searchQuery" 
+               @click="clearSearch" 
+               class="fas fa-times cyber-search-clear"></i>
+          </div>
+          
+          <div v-if="selectedCar" class="cyber-compact-info">
+            <div class="cyber-compact-title">
+              <span class="compact-name">{{ selectedCar.name }}</span>
+              <span class="compact-brand">{{ selectedCar.brand }}</span>
+              <span class="compact-category">{{ selectedCar.category }}</span>
+              
+              <div class="cyber-color-picker-container">
+                <div class="cyber-color-controls">
+                  <div class="cyber-color-picker-mini">
+                    <input type="color" 
+                           class="cyber-color-input-mini" 
+                           :value="selectedCar.currentColor || '#FFFFFF'"
+                           @input="updateCarColor($event, selectedCar)"
+                           value="#FFFFFF">
+                    <div class="cyber-color-preview-mini" :style="{ backgroundColor: selectedCar.currentColor || '#ffffff' }">
+                      <i class="fas fa-palette"></i>
+                    </div>
+                  </div>
+                  
+                  <div class="cyber-color-buttons">
+                    <button class="cyber-color-btn cyber-primary-btn" 
+                            :class="{ 'active': activeColorType === 'primary' }"
+                            @click="saveCarColor(selectedCar, 'primary')">
+                      <i class="fas fa-square-full" :style="{ color: selectedCar.primaryColor?.hex || '#ffffff' }"></i>
+                      <span>Primary</span>
+                    </button>
+                    <button class="cyber-color-btn cyber-secondary-btn" 
+                            :class="{ 'active': activeColorType === 'secondary' }"
+                            @click="saveCarColor(selectedCar, 'secondary')">
+                      <i class="fas fa-square-full" :style="{ color: selectedCar.secondaryColor?.hex || '#ffffff' }"></i>
+                      <span>Secondary</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div class="cyber-compact-price-stock">
+              <div class="compact-price">{{ formatPrice(selectedCar.price) }}</div>
+              <div v-if="selectedCar.stock <= 0" class="compact-stock out-stock">SOLD OUT</div>
+            </div>
+            
+            <div class="cyber-compact-specs">
+              <div class="compact-spec-item">
+                <i class="fas fa-tachometer-alt"></i>
+                <span class="spec-label">SPEED</span>
+                <div class="spec-bar-container">
+                  <div class="spec-bar-bg"></div>
+                  <div class="spec-bar" :style="{ width: (selectedCar.specs.speed / 400 * 100) + '%' }"></div>
+                  <span class="spec-value">{{ selectedCar.specs.speed }}</span>
+                </div>
+              </div>
+              
+              <div class="compact-spec-item">
+                <i class="fas fa-bolt"></i>
+                <span class="spec-label">ACCELERATION</span>
+                <div class="spec-bar-container">
+                  <div class="spec-bar-bg"></div>
+                  <div class="spec-bar spec-bar-accent" :style="{ width: ((6 - selectedCar.specs.acceleration) / 4 * 100) + '%' }"></div>
+                  <span class="spec-value">{{ selectedCar.specs.acceleration }}s</span>
+                </div>
+              </div>
+              
+              <div class="compact-spec-item">
+                <i class="fas fa-car"></i>
+                <span class="spec-label">HANDLING</span>
+                <div class="spec-bar-container">
+                  <div class="spec-bar-bg"></div>
+                  <div class="spec-bar spec-bar-alt" :style="{ width: (selectedCar.specs.handling / 10 * 100) + '%' }"></div>
+                  <span class="spec-value">{{ selectedCar.specs.handling }}</span>
+                </div>
+              </div>
+              
+              <div class="compact-spec-item">
+                <i class="fas fa-gas-pump"></i>
+                <span class="spec-label">FUEL</span>
+                <div class="spec-bar-container">
+                  <div class="spec-bar-bg"></div>
+                  <div class="spec-bar spec-bar-fuel" :style="{ width: (selectedCar.specs.fuelCapacity / 100 * 100) + '%' }"></div>
+                  <span class="spec-value">{{ selectedCar.specs.fuelCapacity }}L</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+        </div>
+        
+        <div class="car-list-scroll">
+          <div v-for="(car, index) in filteredCars" 
+               :key="car._uid"
+               @click="selectCar(index)" 
+               :class="['cyber-car-item', selectedCarIndex === index ? 'cyber-active' : '']">
+            <div class="cyber-thumb">
+              <img :src="'./assets/img/cars/' + car.model + '.png'" 
+                   :alt="car.name"
+                   @error="handleImageError"
+                   @load="$event.target.style.opacity = 1"
+                   :style="car.selectedColor ? { filter: `hue-rotate(${car.colorHue}deg) saturate(${car.colorSaturation}%)` } : {}">
+              <div class="cyber-thumb-overlay"></div>
+            </div>
+            <div class="cyber-car-info">
+              <h3>{{ car.name }}</h3>
+              <p>{{ car.brand }}</p>
+              <div class="cyber-car-price">{{ formatPrice(car.price) }}</div>
+            </div>
+            <div class="cyber-car-type">{{ formatCategoryName(car.category) }}</div>
+            
+            <div class="cyber-color-picker">
+              <div class="cyber-color-title">Araç Rengi</div>
+              <input type="color" 
+                     class="cyber-color-input" 
+                     :value="car.selectedColor || '#FFFFFF'"
+                     @input="updateCarColor($event, car)">
+              <div class="cyber-color-preview" :style="{ backgroundColor: car.selectedColor || '#ffffff' }">
+                {{ car.selectedColor || 'Renk Seçilmedi' }}
+              </div>
+              <button class="cyber-color-apply" @click.stop="applyCarColor(car)">
+                Apply Color
+              </button>
+            </div>
+          </div>
+          
+          <div v-if="hasNoResults" class="cyber-empty-list">
+            <div class="cyber-empty-scanner">
+              <div class="scanner-beam"></div>
+            </div>
+            <div class="cyber-empty-list-icon">
+              <i class="fas fa-car-crash"></i>
+            </div>
+            <div class="cyber-empty-list-title">DATA<span class="cyber-glitch-effect">_</span>ERROR</div>
+            <div class="cyber-empty-list-subtitle">NO VEHICLES FOUND</div>
+            <div class="cyber-empty-list-divider"></div>
+            <div class="cyber-empty-list-message" v-if="error">{{ error }}</div>
+            <div class="cyber-empty-list-message" v-else>
+              <span class="cyber-code">SYSTEM_RESPONSE:</span> 
+              <span class="cyber-code-text">Try different search parameters or select another category</span>
+            </div>
+            <div class="cyber-empty-list-actions">
+              <button @click="clearSearch" class="cyber-empty-button">
+                <i class="fas fa-sync-alt"></i> RESET SEARCH
+              </button>
+            </div>
+          </div>
+
+          <div v-if="error" class="cyber-error-message">
+            <i class="fas fa-exclamation-triangle"></i>
+            <span>{{ error }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="car-detail-panel">
+        <div class="categories-bar">
+          <div class="scroll-indicator-left" v-if="isScrollable && hasScrollLeft" @click="scrollCategoriesLeft()">
+            <i class="fas fa-chevron-left"></i>
+          </div>
+          <div class="categories-container" ref="categoriesContainer" @scroll="checkScroll">
+            <div class="categories-table">
+              <button v-for="category in categories" 
+                      :key="category.id" 
+                      @click="changeCategory(category.value)" 
+                      :class="['cyber-btn', currentCategory === category.value ? 'cyber-btn-active' : '']">
+                {{ category.label }}
+              </button>
+            </div>
+          </div>
+          <div class="scroll-indicator-right" v-if="isScrollable && hasScrollRight" @click="scrollCategoriesRight()">
+            <i class="fas fa-chevron-right"></i>
+          </div>
+          <button @click="Close()" class="cyber-btn cyber-btn-close">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+
+        <div class="car-detail-content" v-if="selectedCar">
+          <div class="cyber-empty-space">
+            <div class="move"></div>
+          </div>
+          
+          <div class="cyber-modern-actions">
+            <div class="cyber-action-container">
+              <button @click="purchaseCar" :disabled="selectedCar.stock <= 0" 
+                      class="cyber-modern-btn" :class="selectedCar.stock > 0 ? 'cyber-btn-buy' : 'cyber-btn-disabled'">
+                <i class="fas fa-shopping-cart"></i>
+                <span>BUY VEHICLE</span>
+              </button>
+              
+              <button @click="initTestDrive" :disabled="selectedCar.stock <= 0" 
+                      class="cyber-modern-btn" :class="selectedCar.stock > 0 ? 'cyber-btn-test' : 'cyber-btn-disabled'">
+                <i class="fas fa-car"></i>
+                <span>TEST DRIVE</span>
+              </button>
+            </div>
+          </div>
+          
+          <div class="cyber-confirm-overlay" v-if="showModal">
+            <div class="cyber-confirm-box cyber-centered-dialog">
+              <div class="cyber-confirm-title">
+                <i class="fas fa-shopping-cart"></i> VEHICLE PURCHASE
+              </div>
+              
+              <div class="cyber-confirm-content">
+                <div class="cyber-vehicle-details">
+                  <div class="cyber-vehicle-name">{{ selectedCar.brand }} {{ selectedCar.name }}</div>
+                  <div class="cyber-vehicle-code">#{{ selectedCar.model.toUpperCase() }}/ID-{{ Math.floor(Math.random() * 9000) + 1000 }}</div>
+                </div>
+                
+                <div class="cyber-payment-options">
+                  <div class="cyber-option-title">SELECT PAYMENT METHOD</div>
+                  <div class="cyber-payment-methods">
+                    <div @click="selectPaymentMethod('cash')" :class="['cyber-payment-method', selectedPaymentMethod === 'cash' ? 'active' : '']">
+                      <i class="fas fa-money-bill-wave"></i>
+                      <span>CASH</span>
+                    </div>
+                    <div @click="selectPaymentMethod('bank')" :class="['cyber-payment-method', selectedPaymentMethod === 'bank' ? 'active' : '']">
+                      <i class="fas fa-university"></i>
+                      <span>BANK</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="cyber-deposit-info">
+                  <div class="cyber-amount-label">TOTAL AMOUNT:</div>
+                  <div class="cyber-amount-value cyber-glow-effect">
+                    <span class="cyber-currency">$</span>
+                    <span class="cyber-amount">{{ formatPrice(selectedCar.price) }}</span>
+                  </div>
+                </div>
+                
+                <div class="cyber-warning cyber-warning-enhanced">
+                  <div class="cyber-warning-icon">
+                    <i class="fas fa-exclamation-triangle"></i>
+                  </div>
+                  <div class="cyber-warning-content">
+                    <div class="cyber-warning-title">WARNING</div>
+                    <div class="cyber-warning-message">This transaction cannot be reversed. Once confirmed, refunds are not possible.</div>
+                  </div>
+                </div>
+                
+                <div class="cyber-action-buttons">
+                  <button @click="showModal = false" class="cyber-action-btn cyber-btn-cancel">
+                    <i class="fas fa-times"></i> 
+                    <span>CANCEL</span>
+                  </button>
+                  <button @click="confirmTransaction" class="cyber-action-btn cyber-btn-confirm">
+                    <i class="fas fa-check"></i> 
+                    <span>CONFIRM</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="cyber-confirm-overlay" v-if="showTestDriveConfirm">
+            <div class="cyber-confirm-box cyber-centered-dialog">
+              <div class="cyber-confirm-title">
+                <i class="fas fa-car"></i> TEST DRIVE
+              </div>
+              
+              <div class="cyber-confirm-content">
+                <div class="cyber-vehicle-details">
+                  <div class="cyber-vehicle-name">{{ selectedCar.brand }} {{ selectedCar.name }}</div>
+                  <div class="cyber-vehicle-code">#{{ selectedCar.model.toUpperCase() }}/ID-{{ Math.floor(Math.random() * 9000) + 1000 }}</div>
+                </div>
+                
+                <div class="cyber-test-info">
+                  <div class="cyber-test-duration">
+                    <i class="fas fa-clock"></i>
+                    <span>Test drive duration: <strong>1 minute</strong></span>
+                  </div>
+                  
+                  <div class="cyber-payment-options">
+                    <div class="cyber-option-title">SELECT DEPOSIT PAYMENT METHOD</div>
+                    <div class="cyber-payment-methods">
+                      <div @click="selectPaymentMethod('cash')" :class="['cyber-payment-method', selectedPaymentMethod === 'cash' ? 'active' : '']">
+                        <i class="fas fa-money-bill-wave"></i>
+                        <span>CASH</span>
+                      </div>
+                      <div @click="selectPaymentMethod('bank')" :class="['cyber-payment-method', selectedPaymentMethod === 'bank' ? 'active' : '']">
+                        <i class="fas fa-university"></i>
+                        <span>BANK</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="cyber-deposit-info">
+                  <div class="cyber-amount-label">DEPOSIT AMOUNT:</div>
+                  <div class="cyber-amount-value cyber-glow-effect">
+                    <span class="cyber-currency">$</span>
+                    <span class="cyber-amount">{{ formatPrice(testDrivePrice) }}</span>
+                  </div>
+                </div>
+                
+                <div class="cyber-warning cyber-warning-enhanced">
+                  <div class="cyber-warning-icon">
+                    <i class="fas fa-exclamation-triangle"></i>
+                  </div>
+                  <div class="cyber-warning-content">
+                    <div class="cyber-warning-title">DEPOSIT WARNING</div>
+                    <div class="cyber-warning-message">Your deposit will not be refunded if you damage the vehicle.</div>
+                  </div>
+                </div>
+                
+                <div class="cyber-action-buttons">
+                  <button @click="cancelTestDrive" class="cyber-action-btn cyber-btn-cancel">
+                    <i class="fas fa-times"></i> 
+                    <span>CANCEL</span>
+                  </button>
+                  <button @click="confirmTestDrive" class="cyber-action-btn cyber-btn-confirm">
+                    <i class="fas fa-check"></i> 
+                    <span>CONFIRM</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="cyber-notifications">
+      <div v-for="(notification, index) in notifications" 
+           :key="notification.id"
+           :data-notification-id="notification.id"
+           class="cyber-notification" 
+           :class="notification.type === 'success' ? 'cyber-notif-success' : notification.type === 'error' ? 'cyber-notif-error' : 'cyber-notif-info'">
+        <div class="notif-icon">
+          <i :class="notification.type === 'success' ? 'fas fa-check-circle' : notification.type === 'error' ? 'fas fa-exclamation-circle' : 'fas fa-info-circle'"></i>
+        </div>
+        <div class="notif-content">
+          <h4>{{ notification.title }}</h4>
+          <p>{{ notification.message }}</p>
+        </div>
+      </div>
+    </div>
+    
+  </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+    <script src="./assets/data.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue@2"></script>
+    <script src="./vue.js"></script>
+    <script src="https://code.jquery.com/jquery-3.5.0.js"></script>
+    <script>
+      $(document).ready(function() {
+        let holding = false;
+        let direction = "", oldx = 0;
+        
+        $(document).on('mousedown', function(e) {
+          holding = true;
+        });
+        
+        $(document).on('mouseup', function(e) {
+          holding = false;
+        });
+        
+        $(document).on('mousemove', function(e) {
+          if (e.pageX < oldx) { 
+            direction = "left"; 
+          } else if (e.pageX > oldx) { 
+            direction = "right"; 
+          }
+          
+          oldx = e.pageX;
+          
+          if (direction == "left" && holding) {
+            if ($(e.target).hasClass("move")) {
+              $.post(`https://${GetParentResourceName()}/rotateright`);
+            }
+          }
+          
+          if (direction == "right" && holding) {
+            if ($(e.target).hasClass("move")) {
+              $.post(`https://${GetParentResourceName()}/rotateleft`);
+            }
+          }
+        });
+      });
+    </script>
+</body>
+
+</html>
